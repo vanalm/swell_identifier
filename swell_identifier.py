@@ -109,7 +109,7 @@ def convert_columns_to_float(dfx):
 
 def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_window):
     '''
-    Determines if there's a swell in the latest row of the DataFrame based on specified criteria.
+    Determines if there's a swell in the latest row of the DataFrame based on specified criteria, and returns the latest buoy readings.
     
     Parameters:
     - df: DataFrame containing the data, sorted by time.
@@ -120,11 +120,13 @@ def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_
     - sustain_window: Number of values following a detected swell start within which the swell conditions must be met again to confirm.
     
     Returns:
-    - True if the latest row indicates a swell, False otherwise.
+    - A tuple containing:
+        - 1 if the latest row indicates a swell, 0 otherwise.
+        - A dictionary of the latest buoy readings: buoy_id, WVHT, DPD, WDIR.
     '''
     latest_index = len(df) - 1
     if latest_index < window:  # Not enough data
-        return False
+        return (0, {})
     
     # Calculate mean and standard deviation for the window leading up to the latest row
     window_mean = df[column_name].iloc[-window:].mean()
@@ -133,16 +135,25 @@ def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_
     # Define the threshold for a significant jump
     threshold = window_mean + (window_std * variability_factor)
     
+    swell_detected = 0
     # Check if the latest value exceeds the threshold and meets the minimum jump criteria
     if df[column_name].iloc[latest_index] > threshold and (df[column_name].iloc[latest_index] - window_mean) >= min_jump:
         # Check for sustainment within the sustain_window
         for j in range(1, min(sustain_window + 1, latest_index + 1)):
             if df[column_name].iloc[latest_index - j] - window_mean >= min_jump:
-                return True
-    return False
-# result = is_swell_now(df, 'DPD', window_size, variability_factor, min_jump, sustain_window)
-
-# Example usage with your DataFrame (assuming it's named df and sorted by 'time')
+                swell_detected = 1
+                break
+    
+    # Extract the latest buoy readings
+    latest_readings = {
+        'buoy_id': df['buoy_id'].iloc[latest_index] if 'buoy_id' in df.columns else None,
+        'WVHT': df['WVHT'].iloc[latest_index] if 'WVHT' in df.columns else None,
+        'DPD': df['DPD'].iloc[latest_index] if 'DPD' in df.columns else None,
+        'WDIR': df['MWD'].iloc[latest_index] if 'MWD' in df.columns else None,
+        'time': df['time'].iloc[latest_index] if 'time' in df.columns else None,
+    }
+    
+    return swell_detected, latest_readings
 
 scraped_dfs = get_buoys(buoy_ids)
 df205 = scraped_dfs[0]
@@ -152,8 +163,11 @@ df205 = df205.loc[:, ['time', 'WVHT', 'DPD', 'MWD']]
 df205['DPD'] = pd.to_numeric(df205['DPD'], errors='coerce')
 # sort the df from early to late
 df205 = df205.sort_values(by='time', ascending=True)
-swell_test = is_swell_now(df205, 'DPD', window_size, variability_factor, min_jump, sustain_window)
-print(f"Swell right now: {swell_test}")
+swell, buoy_data = is_swell_now(df205, 'DPD', window_size, variability_factor, min_jump, sustain_window)
+if swell:
+    print(f"swell arrival detected with {buoy_data}")
+else:
+    print('no swell arrival detected, buoy says:', buoy_data)
 
 
 # prepped_dfs = prep_dfs(dfs, cols_to_keep)
