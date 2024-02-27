@@ -2,3 +2,5 @@ lambda_layer
 .venv/
 __pycache__/
 *.pyc
+python
+

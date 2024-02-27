@@ -1,0 +1,135 @@
+import requests
+from html.parser import HTMLParser
+import pandas as pd
+
+# Define buoy IDs and map
+buoy_ids = ['51101', '51208', '51201', '51210', '51205', '51206']
+buoy_map = {
+    '51101': '186 NM NW of Kauai',
+    '51208': 'Hanalei',
+    '51201': 'Waimea Bay',
+    '51210': 'Kaneohe Bay',
+    '51205': 'Pauwela',
+    '51206': 'Hilo'
+}
+cols_to_keep = ['time', 'WVHT', 'DPD', 'MWD']
+
+# Swell detection parameters
+window_size = 3
+variability_factor = 3
+min_jump = 2
+sustain_window = 2
+
+class TableParser(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.in_table = False
+        self.current_data = []
+        self.all_data = []
+        self.in_td = False
+        self.in_th = False
+
+    def handle_starttag(self, tag, attrs):
+        if tag == 'table':
+            for name, value in attrs:
+                if name == 'id' and value == 'data':
+                    self.in_table = True
+        if self.in_table and tag == 'tr':
+            self.current_data = []
+        if self.in_table and (tag == 'td' or tag == 'th'):
+            if tag == 'td':
+                self.in_td = True
+            if tag == 'th':
+                self.in_th = True
+
+    def handle_endtag(self, tag):
+        if tag == 'table':
+            self.in_table = False
+        if self.in_table and tag == 'tr' and self.current_data:
+            self.all_data.append(self.current_data)
+        if self.in_table and (tag == 'td' or tag == 'th'):
+            if tag == 'td':
+                self.in_td = False
+            if tag == 'th':
+                self.in_th = False
+
+    def handle_data(self, data):
+        if self.in_table and (self.in_td or self.in_th):
+            self.current_data.append(data.strip())
+
+def scrape_buoy_data(buoy_id):
+    url = f'https://www.ndbc.noaa.gov/station_page.php?station={buoy_id}'
+    response = requests.get(url)
+    parser = TableParser()
+    parser.feed(response.text)
+    
+    # Debug: Check if data was found
+    if not parser.all_data:
+        print(f"No data found for buoy {buoy_id}")
+        return pd.DataFrame(columns=cols_to_keep)  # Return an empty DataFrame if no data found
+    
+    headers = parser.all_data[0]
+    data = parser.all_data[1:]  # Skip header row for data
+    df = pd.DataFrame(data, columns=headers)
+    df = df.loc[:, cols_to_keep]  # Keep only necessary columns
+    return df
+
+def prepare_and_analyze_data(buoy_id):
+    df = scrape_buoy_data(buoy_id)
+    if df.empty:
+        print(f"No valid data for analysis for buoy {buoy_id}")
+        return None
+
+    # Convert necessary columns to numeric, leaving 'time' and 'MWD' as strings
+    df['WVHT'] = pd.to_numeric(df['WVHT'], errors='coerce')
+    df['DPD'] = pd.to_numeric(df['DPD'], errors='coerce')
+    df.dropna(subset=['DPD'], inplace=True)  # Ensure analysis is possible
+    
+    if len(df) < window_size + sustain_window:
+        print(f"Not enough data for analysis for buoy {buoy_id}")
+        return None
+    
+    swell_detected, latest_readings = is_swell_now(df, 'DPD', window_size, variability_factor, min_jump, sustain_window)
+    result = {
+        'buoy_id': buoy_id, 
+        'buoy_name': buoy_map.get(buoy_id, "Unknown buoy"),
+        'swell': swell_detected, 
+        **latest_readings
+    }
+    return result
+
+def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_window):
+    latest_index = len(df) - 1
+    window_mean = df[column_name].iloc[-window:].mean()
+    window_std = df[column_name].iloc[-window:].std()
+    threshold = window_mean + (window_std * variability_factor)
+    
+    swell_detected = 0
+    if df[column_name].iloc[latest_index] > threshold and (df[column_name].iloc[latest_index] - window_mean) >= min_jump:
+        for j in range(1, sustain_window + 1):
+            if df[column_name].iloc[latest_index - j] - window_mean >= min_jump:
+                swell_detected = 1
+                break
+    
+    latest_readings = {
+        'time': df['time'].iloc[-1],  # Keep as string
+        'WVHT': df['WVHT'].iloc[-1],
+        'DPD': df['DPD'].iloc[-1],
+        'MWD': df['MWD'].iloc[-1]  # Keep as string
+    }
+    
+    return swell_detected, latest_readings
+
+results = []
+for buoy_id in buoy_ids:
+    result = prepare_and_analyze_data(buoy_id)
+    if result:
+        results.append(result)
+
+# Output the results
+for result in results:
+    if result:
+        if result['swell']:
+            print(f"Swell detected for buoy {result['buoy_id']} with data: {result}")
+        else:
+            print(f"No swell detected for buoy {result['buoy_id']}. Latest data: {result}")

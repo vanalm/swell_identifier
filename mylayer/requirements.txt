@@ -1,0 +1,3 @@
+requests==2.25.1  # This version uses urllib3 that is compatible with older OpenSSL
+lxml==4.6.3       # This version should not be affected by OpenSSL
+twilio==6.50.1    # Choose a version compatible with your requests and OpenSSL version

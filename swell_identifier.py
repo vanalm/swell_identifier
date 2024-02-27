@@ -169,8 +169,3 @@ if swell:
 else:
     print('no swell arrival detected, buoy says:', buoy_data)
 
-
-# prepped_dfs = prep_dfs(dfs, cols_to_keep)
-# df = prepped_dfs[0]
-# df = convert_columns_to_float(df)
-# prepped_wswells = create_swell_feature(df, 'DPD', window_size, variability_factor, min_jump, sustain_window)

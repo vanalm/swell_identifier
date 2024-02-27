@@ -20,6 +20,7 @@ variability_factor = 3
 min_jump = 2
 sustain_window = 2
 
+
 def scrape_buoy_data(buoy_id):
     url = f'https://www.ndbc.noaa.gov/station_page.php?station={buoy_id}'
     response = requests.get(url)
@@ -88,3 +89,4 @@ for result in results:
         print(f"Swell detected for buoy {result['buoy_id']} with data: {result}")
     else:
         print(f"No swell detected for buoy {result['buoy_id']}. Latest data: {result}")
+

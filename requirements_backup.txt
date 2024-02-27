@@ -1,0 +1,17 @@
+
+numpy
+twilio
+certifi
+idna
+lxml
+python-dateutil
+pytz
+requests
+six
+tqdm
+tzdata
+urllib3
+html5lib 
+lxml
+pandas
+bs4
