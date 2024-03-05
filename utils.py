@@ -28,8 +28,9 @@ dynamodb = boto3.resource('dynamodb')
 SESSION_LENGTH = int(os.environ['SESSION_LENGTH'])
 
 SESSIONS_TABLE = dynamodb.Table('sessions')
-swell_table = dynamodb.Table('SwellNotifications')
-users_table = dynamodb.Table('users')
+SWELL_TABLE = dynamodb.Table('SwellNotifications')
+USERS_TABLE = dynamodb.Table('users')
+CURRENT_SWELLS_TABLE = dynamodb.Table('current_swells')
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -113,7 +114,6 @@ def prepare_and_analyze_data(buoy_id):
         **latest_readings
     }
     return result
-
 
 
 def check_for_swells(buoy_ids = BUOY_IDS):
@@ -294,3 +294,43 @@ def unsubscribe_user_from_swells(phone_number, buoy_id):
     )
     
     print(f"Subscription removed for {phone_number} from buoy {buoy_id}")
+
+def get_ttl(hours_to_expire):
+    """
+    Get the Time To Live (TTL) value for a DynamoDB item based on the current time and an offset in hours.
+
+    Args:
+    - hours_to_expire (int): The number of hours from the current time when the item should expire.
+
+    Returns:
+    int: The TTL value in epoch seconds.
+    """
+    # Get the current time in epoch seconds
+    current_time = int(time.time())
+    # Calculate the TTL in epoch seconds
+    ttl = current_time + (hours_to_expire * 60 * 60)
+    return ttl
+
+def set_swell(buoy_id, ttl):
+    """
+    Add an entry to the 'current_swells' table for a detected swell.
+
+    Args:
+    - buoy_id (str): The ID of the buoy where the swell was detected.
+    - ttl (int): The Time To Live (TTL) value for the entry in epoch seconds.
+
+    Returns:
+    dict: The response from the DynamoDB 'put_item' operation.
+    """
+    try:
+        response = CURRENT_SWELLS_TABLE.put_item(
+            Item={
+                'buoy_id': buoy_id,
+                'ttl': ttl
+            }
+        )
+    except Exception as e:
+        logger.error(f"Error adding swell entry to current_swells table: {e}")
+        
+        return None
+    return response

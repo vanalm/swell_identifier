@@ -113,29 +113,6 @@ def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_
 
     # Latest index is considered as len(df) - 1, meaning the last row in the DataFrame
     return swell_detected_in_latest_reading, latest_readings#, df
-# old function
-# def is_swell_now(df, column_name, window, variability_factor, min_jump, sustain_window):
-#     latest_index = len(df) - 1
-#     window_mean = df[column_name].iloc[-window:].mean()
-#     window_std = df[column_name].iloc[-window:].std()
-#     threshold = window_mean + (window_std * variability_factor)
-    
-#     swell_detected = 0
-#     if df[column_name].iloc[latest_index] > threshold and (df[column_name].iloc[latest_index] - window_mean) >= min_jump:
-#         for j in range(1, sustain_window + 1):
-#             if df[column_name].iloc[latest_index - j] - window_mean >= min_jump:
-#                 swell_detected = 1
-#                 break
-    
-#     latest_readings = {
-#         'time': df['time'].iloc[-1],  # Keep as string
-#         'WVHT': df['WVHT'].iloc[-1],
-#         'DPD': df['DPD'].iloc[-1],
-#         'MWD': df['MWD'].iloc[-1]  # Keep as string
-#     }
-    
-#     return swell_detected, latest_readings
-
 def prepare_and_analyze_data(buoy_id):
     df = scrape_buoy_data(buoy_id)
     # Convert necessary columns to numeric, leaving 'time' and 'MWD' as strings
