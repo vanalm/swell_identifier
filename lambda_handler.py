@@ -65,7 +65,7 @@ def lambda_handler(event=None, context=None):
                 set_swell(result['buoy_id'], ttl)
 
                 swell_direction = DIRECTION_MAP.get(result['MWD'], result['MWD'])
-                msg = f"Swell incoming from the {swell_direction}! It just hit the {result['buoy_name']} buoy at {result['WVHT']}ft @ {result['DPD']} seconds. Expect it to fill in over the coming hours.\n\n Any questions? Just ask."
+                msg = f"{result['buoy_name']} buoy alert!\n\n {swell_direction} swell @ {result['WVHT']}ft & {result['DPD']}sec.\n\nhttps://www.ndbc.noaa.gov/station_page.php?station={result['buoy_id']}.\n\n Any questions? Just ask."
                 
                 # db_response = SWELL_TABLE.query(KeyConditionExpression=boto3.dynamodb.conditions.Key('buoy_id').eq(result['buoy_id']))
 
